@@ -3,7 +3,7 @@
 // ============================
 
 // 🔗 CHANGE THIS to your Render backend URL after deploying
-const API_BASE = "https://your-backend.onrender.com";
+const API_BASE = "https://expenseiq-u03u.onrender.com";
 
 // ---- State ----
 let expenses = [];
