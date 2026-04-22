@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>ExpenseIQ — Smart Expense Tracker</title>
+  <title>ExpenseIQ — Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
-<body class="min-h-screen bg-gray-950 text-white" style="font-family: 'Space Grotesk', sans-serif;">
+<body class="min-h-screen bg-gray-950 text-white" style="font-family:'Space Grotesk',sans-serif;">
 
   <!-- Animated background -->
   <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
@@ -31,9 +31,26 @@
           <p class="text-xs text-white/40" style="font-family:'JetBrains Mono',monospace">smart expense tracker</p>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <div class="status-dot"></div>
-        <span class="text-xs text-white/40" style="font-family:'JetBrains Mono',monospace">live sync</span>
+
+      <!-- User Info + Logout -->
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          <div class="status-dot"></div>
+          <span class="text-xs text-white/40 hidden sm:block" style="font-family:'JetBrains Mono',monospace">live sync</span>
+        </div>
+        <!-- User Avatar + Name -->
+        <div class="flex items-center gap-2 glass-card px-3 py-2 rounded-xl">
+          <div class="w-7 h-7 rounded-lg logo-gradient flex items-center justify-center text-xs font-bold" id="user-avatar">?</div>
+          <span class="text-sm font-medium text-white/70 hidden sm:block" id="user-name">User</span>
+        </div>
+        <!-- Logout -->
+        <button onclick="logout()" title="Sign Out"
+          class="glass-card px-3 py-2 rounded-xl text-white/40 hover:text-red-400 transition-colors text-sm flex items-center gap-1.5 hover:border-red-500/20">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+          </svg>
+          <span class="hidden sm:inline text-xs">Logout</span>
+        </button>
       </div>
     </div>
   </header>
@@ -77,8 +94,7 @@
 
             <div>
               <label class="block text-xs text-white/40 mb-1.5 uppercase tracking-wider">Category</label>
-              <select id="category"
-                class="input-field w-full px-4 py-3 rounded-xl text-white outline-none transition-all cursor-pointer">
+              <select id="category" class="input-field w-full px-4 py-3 rounded-xl text-white outline-none transition-all cursor-pointer">
                 <option value="" disabled selected style="background:#111827">Select category</option>
                 <option value="Food" style="background:#111827">🍔 Food</option>
                 <option value="Travel" style="background:#111827">✈️ Travel</option>
@@ -93,8 +109,7 @@
 
             <div>
               <label class="block text-xs text-white/40 mb-1.5 uppercase tracking-wider">Date</label>
-              <input type="date" id="date"
-                class="input-field w-full px-4 py-3 rounded-xl text-white outline-none transition-all" />
+              <input type="date" id="date" class="input-field w-full px-4 py-3 rounded-xl text-white outline-none transition-all" />
             </div>
 
             <div>
@@ -104,7 +119,7 @@
             </div>
 
             <button id="add-btn" onclick="addExpense()"
-              class="add-btn w-full py-3.5 rounded-xl font-semibold text-sm tracking-wide transition-all relative overflow-hidden">
+              class="add-btn w-full py-3.5 rounded-xl font-semibold text-sm tracking-wide transition-all">
               <span id="btn-text">+ Add Expense</span>
               <span id="btn-loader" class="hidden items-center justify-center gap-2">
                 <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
@@ -131,10 +146,9 @@
         </div>
       </div>
 
-      <!-- RIGHT: Bar Chart + Expenses List -->
+      <!-- RIGHT: Bar Chart + Expenses -->
       <div class="lg:col-span-3 space-y-6">
 
-        <!-- Bar Chart -->
         <div class="glass-card rounded-2xl p-6">
           <h2 class="text-xs font-semibold uppercase tracking-widest text-white/50 mb-5">Monthly Spending</h2>
           <div class="relative h-48">
@@ -146,27 +160,20 @@
           </div>
         </div>
 
-        <!-- Expenses List -->
         <div class="glass-card rounded-2xl p-6">
           <div class="flex items-center justify-between mb-5">
             <h2 class="text-xs font-semibold uppercase tracking-widest text-white/50">Recent Expenses</h2>
             <span id="expense-badge" class="text-xs bg-white/5 text-white/40 px-2.5 py-1 rounded-full" style="font-family:'JetBrains Mono',monospace">0 items</span>
           </div>
-
-          <!-- Loading State -->
           <div id="loading" class="flex flex-col items-center justify-center py-12 gap-3">
             <div class="loader-ring"></div>
             <p class="text-sm text-white/30">Loading expenses...</p>
           </div>
-
-          <!-- Empty State -->
           <div id="empty-state" class="hidden flex-col items-center justify-center py-12 text-center">
             <div class="text-5xl mb-3">🪙</div>
             <p class="text-white/40 text-sm">No expenses yet</p>
             <p class="text-white/20 text-xs mt-1">Add your first expense to get started</p>
           </div>
-
-          <!-- Expense Cards -->
           <div id="expense-list" class="space-y-3"></div>
         </div>
 

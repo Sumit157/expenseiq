@@ -1,18 +1,31 @@
-# 💰 ExpenseIQ — Smart Expense Tracker
+# 💰 ExpenseIQ v2 — Smart Expense Tracker with Authentication
 
-A full-stack expense tracking app with beautiful dark glassmorphism UI and Chart.js analytics.
+Multi-user expense tracker with JWT authentication and bcrypt-encrypted passwords.
+
+---
+
+## 🔐 Security Overview
+
+| Feature | Implementation |
+|---|---|
+| Password storage | bcrypt (12 salt rounds) — industry standard |
+| Authentication | JWT (JSON Web Tokens) — 7-day expiry |
+| Route protection | Middleware checks every API request |
+| Data isolation | Every query filters by `userId` — users only see their own data |
+| Password never returned | `toJSON()` override strips password from all responses |
 
 ---
 
 ## 🧱 Tech Stack
 
-| Layer     | Technology              |
-|-----------|------------------------|
-| Frontend  | HTML, Tailwind CSS, Vanilla JS |
-| Charts    | Chart.js               |
-| Backend   | Node.js + Express      |
-| Database  | MongoDB Atlas          |
-| Hosting   | Vercel (frontend) + Render (backend) |
+| Layer | Technology |
+|---|---|
+| Frontend | HTML, Tailwind CSS, Vanilla JS |
+| Charts | Chart.js |
+| Backend | Node.js + Express |
+| Database | MongoDB Atlas |
+| Auth | JWT + bcryptjs |
+| Hosting | Vercel (frontend) + Render (backend) |
 
 ---
 
@@ -21,80 +34,92 @@ A full-stack expense tracking app with beautiful dark glassmorphism UI and Chart
 ```
 project/
 ├── frontend/
-│   ├── index.html      ← UI with Tailwind CSS + Chart.js
-│   ├── style.css       ← Glassmorphism, animations, dark theme
-│   └── script.js       ← Fetch API, CRUD, Charts
+│   ├── auth.html       ← Login / Signup page
+│   ├── auth.js         ← Auth logic (signup, login, token storage)
+│   ├── index.html      ← Dashboard (protected, redirects if not logged in)
+│   ├── script.js       ← CRUD with Authorization header on every request
+│   └── style.css       ← Glassmorphism dark theme
 │
 └── backend/
-    ├── server.js           ← Express entry point
+    ├── server.js               ← Express entry point
     ├── package.json
-    ├── .env.example        ← Copy to .env
+    ├── .env.example            ← Copy to .env
+    ├── middleware/
+    │   └── auth.js             ← JWT verify middleware
     ├── models/
-    │   └── Expense.js      ← Mongoose schema
+    │   ├── User.js             ← User schema + bcrypt hashing
+    │   └── Expense.js          ← Expense schema with userId link
     └── routes/
-        └── expenses.js     ← REST API routes
+        ├── auth.js             ← POST /signup  POST /login
+        └── expenses.js         ← GET / POST / DELETE (all protected)
 ```
 
 ---
 
-## 🚀 STEP-BY-STEP DEPLOYMENT
+## 🚀 DEPLOYMENT — Step by Step
 
-### ✅ STEP 1 — MongoDB Atlas (Free Database)
+### ✅ STEP 1 — MongoDB Atlas
 
 1. Go to [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas) → Sign up free
-2. Create a **Free M0 Cluster** (any region)
-3. Under **Database Access** → Add a DB user (username + password)
-4. Under **Network Access** → Add IP `0.0.0.0/0` (allow all — required for Render)
-5. Click **Connect** → **Drivers** → Copy the connection string:
+2. Create free **M0 Cluster**
+3. **Database Access** → Add user (username + password)
+4. **Network Access** → Add `0.0.0.0/0` (allow all IPs for Render)
+5. **Connect** → **Drivers** → Copy connection string:
    ```
-   mongodb+srv://youruser:yourpassword@cluster0.xxxx.mongodb.net/?retryWrites=true&w=majority
+   mongodb+srv://user:pass@cluster0.xxxx.mongodb.net/expenseiq?retryWrites=true&w=majority
    ```
-6. Add your database name: change `/?` to `/expenseiq?`
 
 ---
 
-### ✅ STEP 2 — Deploy Backend to Render
+### ✅ STEP 2 — Generate a JWT Secret
 
-1. Push your project to GitHub (or GitLab)
-2. Go to [render.com](https://render.com) → New → **Web Service**
-3. Connect your GitHub repo → Select the **backend** folder as root directory
-   - Or set **Root Directory** to `backend`
-4. Fill in:
-   - **Name**: `expenseiq-api`
-   - **Environment**: `Node`
+Run this in your terminal to get a strong random secret:
+```bash
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+```
+Copy the output — you'll need it in Step 3.
+
+---
+
+### ✅ STEP 3 — Deploy Backend to Render
+
+1. Push project to GitHub
+2. [render.com](https://render.com) → New → **Web Service**
+3. Connect repo → Set **Root Directory** to `backend`
+4. Settings:
    - **Build Command**: `npm install`
    - **Start Command**: `node server.js`
-5. Under **Environment Variables**, add:
+5. **Environment Variables** → Add all three:
    ```
-   MONGO_URI = mongodb+srv://youruser:yourpass@cluster0.xxxx.mongodb.net/expenseiq?retryWrites=true&w=majority
+   MONGO_URI     = mongodb+srv://...
+   JWT_SECRET    = (your generated secret from Step 2)
+   JWT_EXPIRES_IN = 7d
    ```
-6. Click **Deploy**
-7. Copy your Render URL (e.g., `https://expenseiq-api.onrender.com`)
-
-**Note**: Free Render services sleep after 15 min. First request may be slow.
+6. Deploy → copy your URL (e.g. `https://expenseiq-api.onrender.com`)
 
 ---
 
-### ✅ STEP 3 — Update Frontend API URL
+### ✅ STEP 4 — Update Frontend API URL
 
-Open `frontend/script.js` and change line 7:
+Open **both** `frontend/auth.js` and `frontend/script.js`.
+Change line 3 (or line 7) in each:
 
 ```js
-// BEFORE:
-const API_BASE = "https://your-backend.onrender.com";
-
-// AFTER (use your actual Render URL):
+// Change this in BOTH files:
 const API_BASE = "https://expenseiq-api.onrender.com";
 ```
 
 ---
 
-### ✅ STEP 4 — Deploy Frontend to Vercel
+### ✅ STEP 5 — Deploy Frontend to Vercel
 
-1. Go to [vercel.com](https://vercel.com) → New Project
-2. Import your GitHub repo
-3. Set **Root Directory** to `frontend`
-4. Click **Deploy** → Done! 🎉
+1. [vercel.com](https://vercel.com) → New Project → Import repo
+2. Set **Root Directory** to `frontend`
+3. No build command needed
+4. Deploy → Done! 🎉
+
+The app opens at `auth.html` by default. Update your Vercel project settings if needed:
+- **Output Directory**: `frontend`
 
 ---
 
@@ -105,75 +130,70 @@ const API_BASE = "https://expenseiq-api.onrender.com";
 cd backend
 npm install
 cp .env.example .env
-# Edit .env with your MONGO_URI
+# Fill in MONGO_URI and JWT_SECRET in .env
 node server.js
-# → Running on http://localhost:5000
+# → http://localhost:5000
 
 # Frontend
-# Open frontend/index.html in browser
-# OR use VS Code Live Server extension
-# Make sure script.js API_BASE = "http://localhost:5000"
+# Open frontend/auth.html in browser
+# (or use VS Code Live Server)
+# Set API_BASE = "http://localhost:5000" in auth.js and script.js
 ```
 
 ---
 
 ## 🔌 API Reference
 
-| Method | Endpoint            | Description       |
-|--------|---------------------|-------------------|
-| GET    | /api/expenses       | Get all expenses  |
-| POST   | /api/expenses       | Add new expense   |
-| DELETE | /api/expenses/:id   | Delete expense    |
+### Auth (Public)
 
-### POST /api/expenses — Request Body:
+| Method | Endpoint | Body | Description |
+|---|---|---|---|
+| POST | /api/auth/signup | `{name, email, password}` | Create account |
+| POST | /api/auth/login | `{email, password}` | Sign in, get token |
+
+**Response from both:**
 ```json
 {
-  "amount": 250,
-  "category": "Food",
-  "date": "2024-01-15",
-  "description": "Lunch at cafe"
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": { "id": "...", "name": "John", "email": "john@example.com" }
 }
 ```
 
+### Expenses (Protected — requires `Authorization: Bearer <token>`)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | /api/expenses | Get current user's expenses |
+| POST | /api/expenses | Add expense for current user |
+| DELETE | /api/expenses/:id | Delete (only if owner) |
+
 ---
 
-## 🗄️ MongoDB Schema
+## 🗄️ MongoDB Collections
 
+### users
 ```js
-{
-  amount:      Number   // required, > 0
-  category:    String   // enum: Food|Travel|Shopping|...
-  date:        Date     // required
-  description: String   // required, max 100 chars
-  createdAt:   Date     // auto
-  updatedAt:   Date     // auto
-}
+{ name, email, password (bcrypt hash), createdAt, updatedAt }
+```
+
+### expenses
+```js
+{ userId (ref→User), amount, category, date, description, createdAt, updatedAt }
 ```
 
 ---
 
-## ✨ Features
+## 🔒 How the Auth Flow Works
 
-- ✅ Add / Delete expenses
-- ✅ Stats: Total, Top Category, This Month
-- ✅ Pie chart (category breakdown) with Chart.js
-- ✅ Bar chart (monthly spending) with Chart.js
-- ✅ Dark glassmorphism UI with animations
-- ✅ Gradient cards with hover effects
-- ✅ Toast notifications
-- ✅ Loading states with animated spinner
-- ✅ Fully responsive
-
----
-
-## 🎨 UI Highlights
-
-- **Glassmorphism**: `backdrop-filter: blur` + semi-transparent backgrounds
-- **Animated orbs**: Soft gradient blobs in background
-- **Grid overlay**: Subtle dot/line grid for depth
-- **Gradient text**: CSS `background-clip: text` for colorful headings
-- **Smooth animations**: Card slide-in, delete fade-out, hover transforms
+```
+1. User signs up → password hashed by bcrypt (12 rounds) → saved to DB
+2. User logs in → bcrypt.compare(input, hash) → if match, JWT issued
+3. JWT stored in localStorage → sent as "Authorization: Bearer <token>" header
+4. Every API request → auth middleware verifies JWT → attaches req.user
+5. Expense queries always filter by req.user._id → complete data isolation
+6. User A can never read/delete User B's expenses
+```
 
 ---
 
-Built with ❤️ using vanilla HTML, CSS, and JavaScript.
+Built with ❤️ — Vanilla JS, Express, MongoDB, JWT + bcrypt

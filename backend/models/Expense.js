@@ -6,6 +6,13 @@ const mongoose = require("mongoose");
 
 const expenseSchema = new mongoose.Schema(
   {
+    // 🔑 Links expense to its owner
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true  // speeds up per-user queries
+    },
     amount: {
       type: Number,
       required: [true, "Amount is required"],
@@ -27,9 +34,7 @@ const expenseSchema = new mongoose.Schema(
       maxlength: [100, "Description too long"]
     }
   },
-  {
-    timestamps: true
-  }
+  { timestamps: true }
 );
 
 module.exports = mongoose.model("Expense", expenseSchema);

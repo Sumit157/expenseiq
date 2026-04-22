@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ExpenseIQ — Sign In</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="min-h-screen bg-gray-950 text-white flex items-center justify-center p-4" style="font-family:'Space Grotesk',sans-serif">
+
+  <!-- Background -->
+  <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="grid-bg"></div>
+  </div>
+
+  <!-- Auth Card -->
+  <div class="relative z-10 w-full max-w-md">
+
+    <!-- Logo -->
+    <div class="text-center mb-8">
+      <div class="w-14 h-14 rounded-2xl logo-gradient flex items-center justify-center text-2xl shadow-2xl shadow-violet-500/30 mx-auto mb-4">
+        💰
+      </div>
+      <h1 class="text-2xl font-bold tracking-tight">ExpenseIQ</h1>
+      <p class="text-white/40 text-sm mt-1" style="font-family:'JetBrains Mono',monospace">smart expense tracker</p>
+    </div>
+
+    <!-- Tab Toggle -->
+    <div class="glass-card rounded-2xl p-1 flex mb-6">
+      <button id="tab-login" onclick="switchTab('login')"
+        class="tab-btn active flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all">
+        Sign In
+      </button>
+      <button id="tab-signup" onclick="switchTab('signup')"
+        class="tab-btn flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all">
+        Sign Up
+      </button>
+    </div>
+
+    <!-- Form Card -->
+    <div class="glass-card rounded-2xl p-7">
+
+      <!-- Error/Success Banner -->
+      <div id="auth-banner" class="hidden mb-5 px-4 py-3 rounded-xl text-sm flex items-center gap-2"></div>
+
+      <!-- LOGIN FORM -->
+      <div id="login-form">
+        <h2 class="text-lg font-semibold mb-1">Welcome back</h2>
+        <p class="text-white/40 text-sm mb-6">Sign in to your account to continue</p>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs text-white/40 mb-1.5 uppercase tracking-wider">Email</label>
+            <input type="email" id="login-email" placeholder="you@example.com"
+              class="input-field w-full px-4 py-3 rounded-xl text-white placeholder:text-white/20 outline-none transition-all" />
+          </div>
+          <div>
+            <label class="block text-xs text-white/40 mb-1.5 uppercase tracking-wider">Password</label>
+            <div class="relative">
+              <input type="password" id="login-password" placeholder="••••••••"
+                class="input-field w-full px-4 py-3 rounded-xl text-white placeholder:text-white/20 outline-none transition-all pr-11" />
+              <button type="button" onclick="togglePassword('login-password', this)"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors text-xs px-1">
+                👁
+              </button>
+            </div>
+          </div>
+          <button onclick="handleLogin()"
+            class="add-btn w-full py-3.5 rounded-xl font-semibold text-sm tracking-wide transition-all mt-2" id="login-btn">
+            <span id="login-btn-text">Sign In</span>
+            <span id="login-btn-loader" class="hidden items-center justify-center gap-2">
+              <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              Signing in...
+            </span>
+          </button>
+        </div>
+
+        <p class="text-center text-white/30 text-sm mt-5">
+          Don't have an account?
+          <button onclick="switchTab('signup')" class="text-violet-400 hover:text-violet-300 font-semibold ml-1 transition-colors">Sign up</button>
+        </p>
+      </div>
+
+      <!-- SIGNUP FORM -->
+      <div id="signup-form" class="hidden">
+        <h2 class="text-lg font-semibold mb-1">Create account</h2>
+        <p class="text-white/40 text-sm mb-6">Start tracking your expenses for free</p>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs text-white/40 mb-1.5 uppercase tracking-wider">Full Name</label>
+            <input type="text" id="signup-name" placeholder="John Doe"
+              class="input-field w-full px-4 py-3 rounded-xl text-white placeholder:text-white/20 outline-none transition-all" />
+          </div>
+          <div>
+            <label class="block text-xs text-white/40 mb-1.5 uppercase tracking-wider">Email</label>
+            <input type="email" id="signup-email" placeholder="you@example.com"
+              class="input-field w-full px-4 py-3 rounded-xl text-white placeholder:text-white/20 outline-none transition-all" />
+          </div>
+          <div>
+            <label class="block text-xs text-white/40 mb-1.5 uppercase tracking-wider">Password</label>
+            <div class="relative">
+              <input type="password" id="signup-password" placeholder="Min. 8 characters"
+                class="input-field w-full px-4 py-3 rounded-xl text-white placeholder:text-white/20 outline-none transition-all pr-11" />
+              <button type="button" onclick="togglePassword('signup-password', this)"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors text-xs px-1">
+                👁
+              </button>
+            </div>
+            <!-- Password strength -->
+            <div class="mt-2 space-y-1" id="pwd-hints">
+              <div class="flex items-center gap-2 text-xs" id="hint-len">
+                <span class="w-3 h-3 rounded-full bg-white/10 flex-shrink-0" id="hint-len-dot"></span>
+                <span class="text-white/30">At least 8 characters</span>
+              </div>
+              <div class="flex items-center gap-2 text-xs" id="hint-num">
+                <span class="w-3 h-3 rounded-full bg-white/10 flex-shrink-0" id="hint-num-dot"></span>
+                <span class="text-white/30">Contains a number</span>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs text-white/40 mb-1.5 uppercase tracking-wider">Confirm Password</label>
+            <input type="password" id="signup-confirm" placeholder="••••••••"
+              class="input-field w-full px-4 py-3 rounded-xl text-white placeholder:text-white/20 outline-none transition-all" />
+          </div>
+          <button onclick="handleSignup()"
+            class="add-btn w-full py-3.5 rounded-xl font-semibold text-sm tracking-wide transition-all mt-2" id="signup-btn">
+            <span id="signup-btn-text">Create Account</span>
+            <span id="signup-btn-loader" class="hidden items-center justify-center gap-2">
+              <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              Creating...
+            </span>
+          </button>
+        </div>
+
+        <p class="text-center text-white/30 text-sm mt-5">
+          Already have an account?
+          <button onclick="switchTab('login')" class="text-violet-400 hover:text-violet-300 font-semibold ml-1 transition-colors">Sign in</button>
+        </p>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <p class="text-center text-white/20 text-xs mt-6">
+      Passwords are encrypted with bcrypt · Your data is private
+    </p>
+  </div>
+
+  <script src="auth.js"></script>
+</body>
+</html>
