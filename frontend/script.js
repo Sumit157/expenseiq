@@ -1,17 +1,23 @@
 // ============================
-//  ExpenseIQ — script.js (with Auth)
+//   ExpenseIQ — script.js (with Auth & Multi-Period Charts)
 // ============================
 
-const API_BASE = "https://expenseiq-u03u.onrender.com"; // 🔗 Change after deploy
+const API_BASE = "https://expenseiq-u03u.onrender.com"; 
 
-// ---- Auth Guard: redirect to login if no token ----
+// ---- Auth Guard ----
 const token = localStorage.getItem("token");
 const user  = JSON.parse(localStorage.getItem("user") || "null");
 if (!token || !user) {
   window.location.href = "auth.html";
 }
 
-// ---- Populate user info in header ----
+// ---- State ----
+let expenses = [];
+let pieChart = null;
+let barChart = null;
+let activePeriod = "monthly"; // "daily" | "weekly" | "monthly"
+
+// ---- Initialization ----
 document.addEventListener("DOMContentLoaded", () => {
   if (user) {
     const initials = user.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
@@ -19,8 +25,21 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("user-name").textContent = user.name.split(" ")[0];
   }
   document.getElementById("date").value = new Date().toISOString().split("T")[0];
+  
+  initSpendingToggle(); // Wire up the new period buttons
   fetchExpenses();
 });
+
+function initSpendingToggle() {
+  document.querySelectorAll(".period-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      activePeriod = btn.dataset.period;
+      document.querySelectorAll(".period-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      renderBarChart();
+    });
+  });
+}
 
 // ---- Auth Headers Helper ----
 function authHeaders() {
@@ -37,11 +56,6 @@ function logout() {
   window.location.href = "auth.html";
 }
 
-// ---- State ----
-let expenses = [];
-let pieChart = null;
-let barChart = null;
-
 const CAT_EMOJI = {
   Food: "🍔", Travel: "✈️", Shopping: "🛍️",
   Entertainment: "🎮", Health: "💊", Bills: "📄",
@@ -54,16 +68,14 @@ const CHART_COLORS = [
 ];
 
 // ============================
-//  API CALLS
+//   API CALLS
 // ============================
 
 async function fetchExpenses() {
   showLoading(true);
   try {
-    const res = await fetch(`${API_BASE}/api/expenses`, {
-      headers: authHeaders()
-    });
-    if (res.status === 401) return logout(); // token expired
+    const res = await fetch(`${API_BASE}/api/expenses`, { headers: authHeaders() });
+    if (res.status === 401) return logout();
     if (!res.ok) throw new Error("Failed to fetch");
     expenses = await res.json();
     renderAll();
@@ -134,7 +146,7 @@ async function deleteExpense(id) {
 }
 
 // ============================
-//  RENDER
+//   RENDER LOGIC
 // ============================
 
 function renderAll() {
@@ -216,7 +228,7 @@ function renderExpenseList() {
 }
 
 // ============================
-//  CHARTS
+//   CHARTS LOGIC
 // ============================
 
 function renderCharts() {
@@ -250,38 +262,116 @@ function renderPieChart() {
 }
 
 function renderBarChart() {
-  const monthlyData = getMonthlyTotals();
-  const labels = Object.keys(monthlyData);
-  const data = Object.values(monthlyData);
+  let data, labels;
+
+  if (activePeriod === "daily")      { ({ labels, data } = getDailyTotals());  }
+  else if (activePeriod === "weekly")  { ({ labels, data } = getWeeklyTotals()); }
+  else                                 { ({ labels, data } = getMonthlyTotals()); }
+
   const isEmpty = labels.length === 0;
   document.getElementById("bar-empty").style.display = isEmpty ? "flex" : "none";
+
   const ctx = document.getElementById("bar-chart").getContext("2d");
   if (barChart) barChart.destroy();
   if (isEmpty) return;
+
   const gradient = ctx.createLinearGradient(0, 0, 0, 200);
   gradient.addColorStop(0, "rgba(124,58,237,0.8)");
   gradient.addColorStop(1, "rgba(6,182,212,0.2)");
+
   barChart = new Chart(ctx, {
     type: "bar",
-    data: { labels, datasets: [{ label: "Spending (₹)", data, backgroundColor: gradient, borderColor: "rgba(124,58,237,0.9)", borderWidth: 1, borderRadius: 6, borderSkipped: false }] },
+    data: {
+      labels,
+      datasets: [{
+        label: "Spending (₹)",
+        data,
+        backgroundColor: gradient,
+        borderColor: "rgba(124,58,237,0.9)",
+        borderWidth: 1,
+        borderRadius: 6,
+        borderSkipped: false
+      }]
+    },
     options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ₹${formatNum(ctx.parsed.y)}` }, backgroundColor: "rgba(0,0,0,0.8)", titleColor: "rgba(255,255,255,0.9)", bodyColor: "rgba(255,255,255,0.7)", borderColor: "rgba(255,255,255,0.1)", borderWidth: 1 } },
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: ctx => ` ₹${formatNum(ctx.parsed.y)}` },
+          backgroundColor: "rgba(0,0,0,0.8)",
+          titleColor: "rgba(255,255,255,0.9)",
+          bodyColor: "rgba(255,255,255,0.7)",
+          borderColor: "rgba(255,255,255,0.1)",
+          borderWidth: 1
+        }
+      },
       scales: {
-        x: { grid: { color: "rgba(255,255,255,0.04)" }, ticks: { color: "rgba(255,255,255,0.4)", font: { size: 11, family: "Space Grotesk" } } },
-        y: { grid: { color: "rgba(255,255,255,0.04)" }, ticks: { color: "rgba(255,255,255,0.4)", font: { size: 11, family: "JetBrains Mono" }, callback: v => `₹${formatNum(v)}` } }
+        x: {
+          grid: { color: "rgba(255,255,255,0.04)" },
+          ticks: { color: "rgba(255,255,255,0.4)", font: { size: 11, family: "Space Grotesk" }, maxRotation: 45 }
+        },
+        y: {
+          grid: { color: "rgba(255,255,255,0.04)" },
+          ticks: {
+            color: "rgba(255,255,255,0.4)",
+            font: { size: 11, family: "JetBrains Mono" },
+            callback: v => `₹${formatNum(v)}`
+          }
+        }
       }
     }
   });
 }
 
 // ============================
-//  HELPERS
+//   HELPERS & DATA PROCESSING
 // ============================
 
-function getCategoryTotals() {
-  return expenses.reduce((acc, e) => { acc[e.category] = (acc[e.category] || 0) + e.amount; return acc; }, {});
+function getDailyTotals() {
+  const today = new Date();
+  const result = {};
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const key = d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+    result[key] = 0;
+  }
+  expenses.forEach(e => {
+    const d = new Date(e.date);
+    const diffDays = Math.floor((today - d) / (1000 * 60 * 60 * 24));
+    if (diffDays >= 0 && diffDays < 30) {
+      const key = d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+      if (key in result) result[key] += e.amount;
+    }
+  });
+  return { labels: Object.keys(result), data: Object.values(result) };
 }
+
+function getWeeklyTotals() {
+  const today = new Date();
+  const result = {};
+  for (let i = 11; i >= 0; i--) {
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - i * 7 - today.getDay());
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    const label = `${weekStart.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
+    result[label] = { total: 0, start: weekStart, end: weekEnd };
+  }
+  expenses.forEach(e => {
+    const d = new Date(e.date);
+    for (const [label, bucket] of Object.entries(result)) {
+      if (d >= bucket.start && d <= bucket.end) {
+        bucket.total += e.amount;
+        break;
+      }
+    }
+  });
+  return { labels: Object.keys(result), data: Object.values(result).map(b => b.total) };
+}
+
 function getMonthlyTotals() {
   const months = {};
   expenses.forEach(e => {
@@ -291,9 +381,15 @@ function getMonthlyTotals() {
   });
   const sorted = {};
   Object.keys(months).sort((a, b) => new Date("1 " + a) - new Date("1 " + b)).forEach(k => sorted[k] = months[k]);
-  return sorted;
+  return { labels: Object.keys(sorted), data: Object.values(sorted) };
 }
+
+function getCategoryTotals() {
+  return expenses.reduce((acc, e) => { acc[e.category] = (acc[e.category] || 0) + e.amount; return acc; }, {});
+}
+
 function showLoading(show) { document.getElementById("loading").style.display = show ? "flex" : "none"; }
+
 function setBtnLoading(loading) {
   const btn = document.getElementById("add-btn");
   const txt = document.getElementById("btn-text");
@@ -303,12 +399,14 @@ function setBtnLoading(loading) {
   ldr.classList.toggle("hidden", !loading);
   ldr.classList.toggle("flex", loading);
 }
+
 function clearForm() {
   document.getElementById("amount").value = "";
   document.getElementById("category").value = "";
   document.getElementById("description").value = "";
   document.getElementById("date").value = new Date().toISOString().split("T")[0];
 }
+
 function showToast(icon, msg) {
   const toast = document.getElementById("toast");
   document.getElementById("toast-icon").textContent = icon;
@@ -316,15 +414,18 @@ function showToast(icon, msg) {
   toast.classList.add("show");
   setTimeout(() => toast.classList.remove("show"), 3000);
 }
+
 function formatNum(n) {
   if (n >= 100000) return (n / 100000).toFixed(1) + "L";
   if (n >= 1000) return (n / 1000).toFixed(1) + "K";
   return parseFloat(n.toFixed(2)).toLocaleString("en-IN");
 }
+
 function formatDate(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
+
 function escHtml(str) {
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }

@@ -149,16 +149,35 @@
       <!-- RIGHT: Bar Chart + Expenses -->
       <div class="lg:col-span-3 space-y-6">
 
-        <div class="glass-card rounded-2xl p-6">
-          <h2 class="text-xs font-semibold uppercase tracking-widest text-white/50 mb-5">Monthly Spending</h2>
-          <div class="relative h-48">
-            <canvas id="bar-chart"></canvas>
-            <div id="bar-empty" class="absolute inset-0 flex flex-col items-center justify-center text-white/20">
-              <span class="text-4xl mb-2">📈</span>
-              <span class="text-sm">No data yet</span>
-            </div>
-          </div>
-        </div>
+        <!-- =============================================
+  Replace the "Monthly Spending" glass-card div
+  in your index.html with this block
+============================================== -->
+
+<div class="glass-card rounded-2xl p-6">
+
+  <!-- Header with toggle buttons -->
+  <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
+    <h2 class="text-xs font-semibold uppercase tracking-widest text-white/50">Spending Overview</h2>
+
+    <!-- Period Toggle -->
+    <div class="flex items-center gap-1 bg-white/5 rounded-xl p-1">
+      <button class="period-btn active" data-period="daily">Daily</button>
+      <button class="period-btn" data-period="weekly">Weekly</button>
+      <button class="period-btn" data-period="monthly">Monthly</button>
+    </div>
+  </div>
+
+  <!-- Chart canvas -->
+  <div class="relative h-48">
+    <canvas id="bar-chart"></canvas>
+    <div id="bar-empty" class="absolute inset-0 flex flex-col items-center justify-center text-white/20">
+      <span class="text-4xl mb-2">📈</span>
+      <span class="text-sm">No data yet</span>
+    </div>
+  </div>
+
+</div>
 
         <div class="glass-card rounded-2xl p-6">
           <div class="flex items-center justify-between mb-5">
