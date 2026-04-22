@@ -2,7 +2,7 @@
 //  ExpenseIQ — script.js (with Auth)
 // ============================
 
-const API_BASE = "https://your-backend.onrender.com"; // 🔗 Change after deploy
+const API_BASE = "https://expenseiq-u03u.onrender.com"; // 🔗 Change after deploy
 
 // ---- Auth Guard: redirect to login if no token ----
 const token = localStorage.getItem("token");

@@ -2,7 +2,7 @@
 //  ExpenseIQ — auth.js
 // ============================
 
-const API_BASE = "https://your-backend.onrender.com"; // 🔗 Change after deploy
+const API_BASE = "https://expenseiq-u03u.onrender.com"; // 🔗 Change after deploy
 
 // Redirect to dashboard if already logged in
 if (localStorage.getItem("token")) {
