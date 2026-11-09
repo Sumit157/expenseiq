@@ -2,7 +2,7 @@
 //   ExpenseIQ — script.js (with Auth & Multi-Period Charts)
 // ============================
 
-const API_BASE = "https://expenseiq-u03u.onrender.com"; 
+const API_BASE = "https://expenseiq-u03u.onrender.com";
 
 // ---- Auth Guard ----
 const token = localStorage.getItem("token");
@@ -13,9 +13,19 @@ if (!token || !user) {
 
 // ---- State ----
 let expenses = [];
-let pieChart = null;
 let barChart = null;
 let activePeriod = "monthly"; // "daily" | "weekly" | "monthly"
+const seenIds = new Set();
+let toastTimer = null;
+
+// ---- Palette (matches style.css) ----
+const ACCENT = "#e9a13b";
+const INK = "#efe9de";
+const MUTED = "#8a847a";
+const GRID = "rgba(239, 233, 222, 0.06)";
+const BAR_NEUTRAL = "rgba(239, 233, 222, 0.18)";
+const BAR_NEUTRAL_HOVER = "rgba(239, 233, 222, 0.3)";
+const MONO = "'JetBrains Mono', ui-monospace, monospace";
 
 // ---- Initialization ----
 document.addEventListener("DOMContentLoaded", () => {
@@ -25,8 +35,8 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("user-name").textContent = user.name.split(" ")[0];
   }
   document.getElementById("date").value = new Date().toISOString().split("T")[0];
-  
-  initSpendingToggle(); // Wire up the new period buttons
+
+  initSpendingToggle();
   fetchExpenses();
 });
 
@@ -56,16 +66,12 @@ function logout() {
   window.location.href = "auth.html";
 }
 
-const CAT_EMOJI = {
-  Food: "🍔", Travel: "✈️", Shopping: "🛍️",
-  Entertainment: "🎮", Health: "💊", Bills: "📄",
-  Education: "📚", Other: "📦"
-};
-
-const CHART_COLORS = [
-  "#7c3aed", "#06b6d4", "#f59e0b", "#10b981",
-  "#f472b6", "#60a5fa", "#34d399", "#94a3b8"
-];
+// ============================
+//   ICONS (line set, 1.5 stroke)
+// ============================
+const ICON_ALERT = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>';
+const ICON_CHECK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>';
+const ICON_TRASH = '<svg width="16" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>';
 
 // ============================
 //   API CALLS
@@ -81,7 +87,7 @@ async function fetchExpenses() {
     renderAll();
   } catch (err) {
     console.error(err);
-    showToast("⚠️", "Could not load expenses.");
+    showToast("error", "Could not load expenses");
     expenses = [];
     renderAll();
   } finally {
@@ -95,10 +101,10 @@ async function addExpense() {
   const date = document.getElementById("date").value;
   const description = document.getElementById("description").value.trim();
 
-  if (!amount || amount <= 0) return showToast("⚠️", "Enter a valid amount.");
-  if (!category) return showToast("⚠️", "Select a category.");
-  if (!date) return showToast("⚠️", "Pick a date.");
-  if (!description) return showToast("⚠️", "Add a description.");
+  if (!amount || amount <= 0) return showToast("error", "Enter a valid amount");
+  if (!category) return showToast("error", "Select a category");
+  if (!date) return showToast("error", "Pick a date");
+  if (!description) return showToast("error", "Add a description");
 
   setBtnLoading(true);
   try {
@@ -113,10 +119,10 @@ async function addExpense() {
     expenses.unshift(newExpense);
     renderAll();
     clearForm();
-    showToast("✅", "Expense added!");
+    showToast("success", "Expense added");
   } catch (err) {
     console.error(err);
-    showToast("❌", "Failed to add expense.");
+    showToast("error", "Failed to add expense");
   } finally {
     setBtnLoading(false);
   }
@@ -135,12 +141,13 @@ async function deleteExpense(id) {
       if (res.status === 401) return logout();
       if (!res.ok) throw new Error("Failed to delete");
       expenses = expenses.filter(e => e._id !== id);
+      seenIds.delete(id);
       renderAll();
-      showToast("🗑️", "Expense deleted.");
+      showToast("success", "Expense deleted");
     } catch (err) {
       console.error(err);
       if (card) card.classList.remove("deleting");
-      showToast("❌", "Failed to delete.");
+      showToast("error", "Failed to delete");
     }
   }, 280);
 }
@@ -158,29 +165,58 @@ function renderAll() {
 function renderStats() {
   const total = expenses.reduce((s, e) => s + e.amount, 0);
   document.getElementById("total-amount").textContent = `₹${formatNum(total)}`;
-  document.getElementById("total-count").textContent = `${expenses.length} transaction${expenses.length !== 1 ? "s" : ""}`;
+  document.getElementById("total-count").textContent =
+    `${expenses.length} transaction${expenses.length !== 1 ? "s" : ""}`;
 
-  const catTotals = getCategoryTotals();
-  const cats = Object.entries(catTotals);
+  // Top category
+  const cats = Object.entries(getCategoryTotals()).sort((a, b) => b[1] - a[1]);
   if (cats.length > 0) {
-    cats.sort((a, b) => b[1] - a[1]);
     const [topCat, topAmt] = cats[0];
-    document.getElementById("top-category").textContent = `${CAT_EMOJI[topCat] || "📦"} ${topCat}`;
-    document.getElementById("top-amount").textContent = `₹${formatNum(topAmt)} spent`;
+    const share = total > 0 ? Math.round((topAmt / total) * 100) : 0;
+    document.getElementById("top-category").textContent = topCat;
+    document.getElementById("top-amount").textContent = `${share}% of total`;
   } else {
     document.getElementById("top-category").textContent = "—";
-    document.getElementById("top-amount").textContent = "No data";
+    document.getElementById("top-amount").textContent = "No expenses yet";
   }
 
+  // This month vs last month
   const now = new Date();
-  const monthTotal = expenses
+  const monthTotal = sumBetween(
+    new Date(now.getFullYear(), now.getMonth(), 1),
+    new Date(now.getFullYear(), now.getMonth() + 1, 1)
+  );
+  const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevTotal = sumBetween(
+    prevDate,
+    new Date(now.getFullYear(), now.getMonth(), 1)
+  );
+  const prevLabel = prevDate.toLocaleString("default", { month: "long" });
+
+  document.getElementById("month-amount").textContent = `₹${formatNum(monthTotal)}`;
+  if (expenses.length === 0) {
+    document.getElementById("month-name").textContent = "No expenses yet";
+  } else if (prevTotal > 0) {
+    document.getElementById("month-name").textContent = `vs ₹${formatNum(prevTotal)} in ${prevLabel}`;
+  } else {
+    document.getElementById("month-name").textContent = `no spending in ${prevLabel}`;
+  }
+}
+
+function sumBetween(start, end) {
+  return expenses
     .filter(e => {
-      const d = new Date(e.date);
-      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      const d = parseDate(e.date);
+      return d >= start && d < end;
     })
     .reduce((s, e) => s + e.amount, 0);
-  document.getElementById("month-amount").textContent = `₹${formatNum(monthTotal)}`;
-  document.getElementById("month-name").textContent = now.toLocaleString("default", { month: "long", year: "numeric" });
+}
+
+// Dates arrive as "YYYY-MM-DD"; parse them as local days so bucket
+// boundaries and month totals never shift across time zones.
+function parseDate(dateStr) {
+  const [y, m, d] = String(dateStr).split("-").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
 }
 
 function renderExpenseList() {
@@ -188,10 +224,11 @@ function renderExpenseList() {
   const empty = document.getElementById("empty-state");
   const badge = document.getElementById("expense-badge");
 
-  badge.textContent = `${expenses.length} item${expenses.length !== 1 ? "s" : ""}`;
+  badge.textContent = String(expenses.length);
 
   if (expenses.length === 0) {
     list.innerHTML = "";
+    seenIds.clear();
     empty.classList.remove("hidden");
     empty.classList.add("flex");
     return;
@@ -199,32 +236,23 @@ function renderExpenseList() {
   empty.classList.add("hidden");
   empty.classList.remove("flex");
 
-  list.innerHTML = expenses.map((e, i) => `
-    <div class="expense-card" data-id="${e._id}" style="animation-delay:${i * 40}ms">
-      <div class="flex items-start justify-between gap-3">
-        <div class="flex items-start gap-3 min-w-0">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0" style="background:rgba(255,255,255,0.05)">
-            ${CAT_EMOJI[e.category] || "📦"}
-          </div>
-          <div class="min-w-0">
-            <p class="text-sm font-semibold text-white truncate">${escHtml(e.description)}</p>
-            <div class="flex items-center gap-2 mt-1 flex-wrap">
-              <span class="cat-badge cat-${e.category}">${e.category}</span>
-              <span class="text-xs text-white/30" style="font-family:'JetBrains Mono',monospace">${formatDate(e.date)}</span>
-            </div>
-          </div>
-        </div>
-        <div class="flex items-center gap-2 flex-shrink-0">
-          <span class="text-base font-bold text-white" style="font-family:'JetBrains Mono',monospace">₹${formatNum(e.amount)}</span>
-          <button class="delete-btn" onclick="deleteExpense('${e._id}')" title="Delete">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
-            </svg>
-          </button>
-        </div>
+  list.innerHTML = expenses.map((e, i) => {
+    const isNew = !seenIds.has(e._id);
+    seenIds.add(e._id);
+    const delay = isNew && i < 6 ? ` style="animation-delay:${i * 40}ms"` : "";
+    const enter = isNew ? " row-enter" : "";
+    return `
+    <div class="ledger-row${enter}" data-id="${e._id}"${delay}>
+      <div class="row-main">
+        <p class="row-title">${escHtml(e.description)}</p>
+        <p class="row-meta">${escHtml(e.category)} · ${formatDate(e.date)}</p>
       </div>
-    </div>
-  `).join("");
+      <span class="row-amount">₹${formatNum(e.amount)}</span>
+      <button class="icon-btn" onclick="deleteExpense('${e._id}')" title="Delete" aria-label="Delete ${escHtml(e.description)}">
+        ${ICON_TRASH}
+      </button>
+    </div>`;
+  }).join("");
 }
 
 // ============================
@@ -232,41 +260,46 @@ function renderExpenseList() {
 // ============================
 
 function renderCharts() {
-  renderPieChart();
+  renderCategoryList();
   renderBarChart();
 }
 
-function renderPieChart() {
-  const catTotals = getCategoryTotals();
-  const labels = Object.keys(catTotals);
-  const data = Object.values(catTotals);
-  const isEmpty = labels.length === 0;
-  document.getElementById("pie-empty").style.display = isEmpty ? "flex" : "none";
-  const ctx = document.getElementById("pie-chart").getContext("2d");
-  if (pieChart) pieChart.destroy();
-  if (isEmpty) return;
-  pieChart = new Chart(ctx, {
-    type: "doughnut",
-    data: {
-      labels,
-      datasets: [{ data, backgroundColor: CHART_COLORS.map(c => c + "cc"), borderColor: CHART_COLORS, borderWidth: 1.5, hoverOffset: 8 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: true, cutout: "65%",
-      plugins: {
-        legend: { position: "bottom", labels: { color: "rgba(255,255,255,0.5)", font: { size: 11, family: "Space Grotesk" }, boxWidth: 10, padding: 12 } },
-        tooltip: { callbacks: { label: ctx => ` ₹${formatNum(ctx.parsed)}` }, backgroundColor: "rgba(0,0,0,0.8)", titleColor: "rgba(255,255,255,0.9)", bodyColor: "rgba(255,255,255,0.7)", borderColor: "rgba(255,255,255,0.1)", borderWidth: 1 }
-      }
-    }
-  });
+function renderCategoryList() {
+  const totals = getCategoryTotals();
+  const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+  const list = document.getElementById("cat-list");
+  const empty = document.getElementById("cat-empty");
+
+  if (entries.length === 0) {
+    list.innerHTML = "";
+    empty.style.display = "flex";
+    return;
+  }
+  empty.style.display = "none";
+
+  const total = entries.reduce((s, [, v]) => s + v, 0);
+  const max = entries[0][1];
+
+  list.innerHTML = entries.map(([name, value], i) => {
+    const share = total > 0 ? Math.round((value / total) * 100) : 0;
+    const width = Math.max(4, (value / max) * 100);
+    return `
+      <div class="cat-row${i === 0 ? " is-top" : ""}">
+        <div class="cat-head">
+          <span class="cat-name">${escHtml(name)}</span>
+          <span class="cat-value">₹${formatNum(value)} · ${share}%</span>
+        </div>
+        <div class="cat-track"><div class="cat-fill" style="width:${width}%"></div></div>
+      </div>`;
+  }).join("");
 }
 
 function renderBarChart() {
   let data, labels;
 
-  if (activePeriod === "daily")      { ({ labels, data } = getDailyTotals());  }
-  else if (activePeriod === "weekly")  { ({ labels, data } = getWeeklyTotals()); }
-  else                                 { ({ labels, data } = getMonthlyTotals()); }
+  if (activePeriod === "daily")       ({ labels, data } = getDailyTotals());
+  else if (activePeriod === "weekly") ({ labels, data } = getWeeklyTotals());
+  else                                ({ labels, data } = getMonthlyTotals());
 
   const isEmpty = labels.length === 0;
   document.getElementById("bar-empty").style.display = isEmpty ? "flex" : "none";
@@ -275,48 +308,71 @@ function renderBarChart() {
   if (barChart) barChart.destroy();
   if (isEmpty) return;
 
-  const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-  gradient.addColorStop(0, "rgba(124,58,237,0.8)");
-  gradient.addColorStop(1, "rgba(6,182,212,0.2)");
+  // One accent: the current period. Everything else sits in a neutral step.
+  const fill = labels.map((_, i) =>
+    i === labels.length - 1 ? ACCENT : BAR_NEUTRAL
+  );
+  const hover = labels.map((_, i) =>
+    i === labels.length - 1 ? ACCENT : BAR_NEUTRAL_HOVER
+  );
 
   barChart = new Chart(ctx, {
     type: "bar",
     data: {
       labels,
       datasets: [{
-        label: "Spending (₹)",
+        label: "Spending",
         data,
-        backgroundColor: gradient,
-        borderColor: "rgba(124,58,237,0.9)",
-        borderWidth: 1,
-        borderRadius: 6,
-        borderSkipped: false
+        backgroundColor: fill,
+        hoverBackgroundColor: hover,
+        borderRadius: 3,
+        borderSkipped: false,
+        maxBarThickness: 56,
+        categoryPercentage: 0.7,
+        barPercentage: 0.9
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: { duration: 300, easing: "easeOutQuart" },
       plugins: {
         legend: { display: false },
         tooltip: {
-          callbacks: { label: ctx => ` ₹${formatNum(ctx.parsed.y)}` },
-          backgroundColor: "rgba(0,0,0,0.8)",
-          titleColor: "rgba(255,255,255,0.9)",
-          bodyColor: "rgba(255,255,255,0.7)",
-          borderColor: "rgba(255,255,255,0.1)",
-          borderWidth: 1
+          displayColors: false,
+          backgroundColor: "#262421",
+          borderColor: "rgba(239, 233, 222, 0.12)",
+          borderWidth: 1,
+          cornerRadius: 8,
+          padding: 10,
+          titleColor: INK,
+          bodyColor: "#aaa398",
+          titleFont: { family: MONO, size: 12, weight: "500" },
+          bodyFont: { family: MONO, size: 12 },
+          callbacks: { label: ctx => `₹${formatNum(ctx.parsed.y)}` }
         }
       },
       scales: {
         x: {
-          grid: { color: "rgba(255,255,255,0.04)" },
-          ticks: { color: "rgba(255,255,255,0.4)", font: { size: 11, family: "Space Grotesk" }, maxRotation: 45 }
+          border: { display: false },
+          grid: { display: false },
+          ticks: {
+            color: MUTED,
+            font: { family: MONO, size: 11 },
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: 8,
+            padding: 8
+          }
         },
         y: {
-          grid: { color: "rgba(255,255,255,0.04)" },
+          border: { display: false },
+          grid: { color: GRID },
           ticks: {
-            color: "rgba(255,255,255,0.4)",
-            font: { size: 11, family: "JetBrains Mono" },
+            color: MUTED,
+            font: { family: MONO, size: 11 },
+            maxTicksLimit: 5,
+            padding: 8,
             callback: v => `₹${formatNum(v)}`
           }
         }
@@ -331,16 +387,17 @@ function renderBarChart() {
 
 function getDailyTotals() {
   const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const result = {};
   for (let i = 29; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
+    const d = new Date(todayStart);
+    d.setDate(todayStart.getDate() - i);
     const key = d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
     result[key] = 0;
   }
   expenses.forEach(e => {
-    const d = new Date(e.date);
-    const diffDays = Math.floor((today - d) / (1000 * 60 * 60 * 24));
+    const d = parseDate(e.date);
+    const diffDays = Math.round((todayStart - d) / (1000 * 60 * 60 * 24));
     if (diffDays >= 0 && diffDays < 30) {
       const key = d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
       if (key in result) result[key] += e.amount;
@@ -351,18 +408,17 @@ function getDailyTotals() {
 
 function getWeeklyTotals() {
   const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const result = {};
   for (let i = 11; i >= 0; i--) {
-    const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() - i * 7 - today.getDay());
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
+    const weekStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() - i * 7 - todayStart.getDay());
+    const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6, 23, 59, 59, 999);
     const label = `${weekStart.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
     result[label] = { total: 0, start: weekStart, end: weekEnd };
   }
   expenses.forEach(e => {
-    const d = new Date(e.date);
-    for (const [label, bucket] of Object.entries(result)) {
+    const d = parseDate(e.date);
+    for (const bucket of Object.values(result)) {
       if (d >= bucket.start && d <= bucket.end) {
         bucket.total += e.amount;
         break;
@@ -375,7 +431,7 @@ function getWeeklyTotals() {
 function getMonthlyTotals() {
   const months = {};
   expenses.forEach(e => {
-    const d = new Date(e.date);
+    const d = parseDate(e.date);
     const key = d.toLocaleString("default", { month: "short", year: "2-digit" });
     months[key] = (months[key] || 0) + e.amount;
   });
@@ -407,22 +463,25 @@ function clearForm() {
   document.getElementById("date").value = new Date().toISOString().split("T")[0];
 }
 
-function showToast(icon, msg) {
+function showToast(type, msg) {
   const toast = document.getElementById("toast");
-  document.getElementById("toast-icon").textContent = icon;
+  document.getElementById("toast-icon").innerHTML =
+    type === "success" ? ICON_CHECK : ICON_ALERT;
   document.getElementById("toast-msg").textContent = msg;
+  toast.classList.toggle("is-success", type === "success");
+  toast.classList.toggle("is-error", type === "error");
   toast.classList.add("show");
-  setTimeout(() => toast.classList.remove("show"), 3000);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 3000);
 }
 
+// One number format across the screen: Indian grouping, no abbreviations
 function formatNum(n) {
-  if (n >= 100000) return (n / 100000).toFixed(1) + "L";
-  if (n >= 1000) return (n / 1000).toFixed(1) + "K";
-  return parseFloat(n.toFixed(2)).toLocaleString("en-IN");
+  return Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 });
 }
 
 function formatDate(dateStr) {
-  const d = new Date(dateStr);
+  const d = parseDate(dateStr);
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
